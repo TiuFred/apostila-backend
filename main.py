@@ -114,94 +114,116 @@ class GenerateRequest(BaseModel):
 
 @app.post("/generate")
 async def generate(req: GenerateRequest):
-    names = ", ".join(i["title"] for i in req.items)
-    contents = []
+    # Build rich context from each item
+    item_blocks = []
     for i in req.items:
-        c = i.get("scraped_content", "")
-        if c:
-            contents.append(f"[{i['title']}]: {c[:600]}")
-    ctx_note = f"\n\nConteúdo extraído:\n" + "\n\n".join(contents) if contents else ""
+        block = f"### Autoestudo: {i['title']}"
+        if i.get("week"):
+            block += f" ({i['week']})"
+        if i.get("notes"):
+            block += f"\nInstruções do usuário: {i['notes']}"
+        if i.get("scraped_content"):
+            block += f"\nConteúdo extraído:\n{i['scraped_content'][:1200]}"
+        elif i.get("url"):
+            block += f"\nURL: {i['url']}"
+        item_blocks.append(block)
+
+    ctx = "\n\n".join(item_blocks)
+    names = ", ".join(i["title"] for i in req.items)
+    weeks = sorted(set(i["week"] for i in req.items if i.get("week")))
+    week_note = f" (Semanas: {', '.join(weeks)})" if weeks else ""
+
+    base_instruction = f"""Você é um assistente educacional. Crie o material EXCLUSIVAMENTE com base nos conteúdos abaixo dos autoestudos fornecidos. NÃO invente conteúdo genérico. Use apenas o que está presente nos textos extraídos e nas instruções do usuário. Se um autoestudo não tiver conteúdo extraído, use o título como referência temática.
+
+Matéria: {req.subject}{week_note}
+Autoestudos selecionados: {names}
+
+{ctx}
+"""
 
     prompts = {
-        "apostila": f"""Crie uma apostila didática completa sobre "{req.subject}" com base nos autoestudos: {names}.{ctx_note}
-
-Retorne JSON com esta estrutura EXATA (somente JSON, sem markdown):
-{{
-  "titulo": "Apostila de {req.subject}",
-  "introducao": "2-3 parágrafos introdutórios",
-  "secoes": [
-    {{
-      "titulo": "Título da seção",
-      "conteudo": "Conteúdo explicativo detalhado",
-      "topicos": ["tópico 1", "tópico 2", "tópico 3"],
-      "exemplo": "Exemplo prático concreto"
-    }}
-  ],
-  "resumo": "Resumo final em 1 parágrafo",
-  "referencias": ["ref 1", "ref 2"]
-}}""",
-
-        "mapa": f"""Crie um mapa mental estruturado sobre "{req.subject}" baseado em: {names}.{ctx_note}
+        "apostila": base_instruction + f"""
+Agora crie uma apostila didática completa e detalhada baseada EXCLUSIVAMENTE nos conteúdos acima.
 
 Retorne JSON (somente JSON, sem markdown):
 {{
-  "centro": "{req.subject}",
+  "titulo": "Apostila de {req.subject}{week_note}",
+  "introducao": "2-3 parágrafos introdutórios baseados no conteúdo real dos autoestudos",
+  "secoes": [
+    {{
+      "titulo": "Título da seção (derivado do conteúdo real)",
+      "conteudo": "Conteúdo explicativo detalhado extraído dos autoestudos (mínimo 3 parágrafos)",
+      "topicos": ["tópico concreto 1", "tópico concreto 2", "tópico concreto 3"],
+      "exemplo": "Exemplo prático baseado no conteúdo real"
+    }}
+  ],
+  "resumo": "Resumo final baseado no que foi abordado nos autoestudos",
+  "referencias": ["título e fonte de cada autoestudo"]
+}}""",
+
+        "mapa": base_instruction + f"""
+Agora crie um mapa mental estruturado baseado EXCLUSIVAMENTE nos conteúdos acima.
+
+Retorne JSON (somente JSON, sem markdown):
+{{
+  "centro": "{req.subject}{week_note}",
   "ramos": [
     {{
-      "titulo": "Ramo principal",
+      "titulo": "Conceito real do conteúdo",
       "cor": "#22C9A0",
       "subramos": [
-        {{"titulo": "Subramo", "itens": ["item 1", "item 2", "item 3"]}}
+        {{"titulo": "Subtópico real", "itens": ["detalhe concreto 1", "detalhe concreto 2"]}}
       ]
     }}
   ]
 }}
+Use 4-6 ramos com cores: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7""",
 
-Use 4-6 ramos com cores variadas: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7""",
-
-        "objetiva": f"""Crie 12 questões de múltipla escolha sobre "{req.subject}" baseadas em: {names}.{ctx_note}
+        "objetiva": base_instruction + f"""
+Agora crie 12 questões de múltipla escolha baseadas EXCLUSIVAMENTE nos conteúdos acima. As questões devem testar conceitos reais presentes nos textos extraídos.
 
 Retorne JSON (somente JSON, sem markdown):
 {{
-  "titulo": "Simulado Objetiva — {req.subject}",
+  "titulo": "Simulado Objetiva — {req.subject}{week_note}",
   "questoes": [
     {{
       "numero": 1,
-      "enunciado": "Texto da questão",
+      "enunciado": "Questão baseada em conceito real do conteúdo",
       "alternativas": {{"a":"texto","b":"texto","c":"texto","d":"texto","e":"texto"}},
       "resposta": "a",
-      "justificativa": "Explicação da resposta correta",
+      "justificativa": "Explicação baseada no conteúdo extraído",
       "dificuldade": "Fácil"
     }}
   ]
 }}
+Varie dificuldade: 4 Fácil, 5 Média, 3 Difícil. O gabarito deve vir por último no PDF.""",
 
-Varie dificuldade: 4 Fácil, 5 Média, 3 Difícil.""",
-
-        "dissertativa": f"""Crie 6 questões dissertativas sobre "{req.subject}" baseadas em: {names}.{ctx_note}
+        "dissertativa": base_instruction + f"""
+Agora crie 6 questões dissertativas baseadas EXCLUSIVAMENTE nos conteúdos acima. As questões devem exigir reflexão sobre os temas reais dos autoestudos.
 
 Retorne JSON (somente JSON, sem markdown):
 {{
-  "titulo": "Simulado Dissertativo — {req.subject}",
+  "titulo": "Simulado Dissertativo — {req.subject}{week_note}",
   "questoes": [
     {{
       "numero": 1,
-      "enunciado": "Questão aberta desafiadora",
+      "enunciado": "Questão aberta sobre conceito real do conteúdo",
       "valor": "2,0",
-      "gabarito": "Resposta completa esperada",
-      "pontos_chave": ["conceito 1", "conceito 2", "conceito 3"],
+      "gabarito": "Resposta esperada baseada no conteúdo extraído",
+      "pontos_chave": ["conceito real 1", "conceito real 2", "conceito real 3"],
       "dificuldade": "Média"
     }}
   ]
 }}""",
 
-        "flashcards": f"""Crie 20 flashcards de revisão sobre "{req.subject}" baseados em: {names}.{ctx_note}
+        "flashcards": base_instruction + f"""
+Agora crie 20 flashcards de revisão baseados EXCLUSIVAMENTE nos conteúdos acima. Cada card deve conter um conceito real presente nos textos.
 
 Retorne JSON (somente JSON, sem markdown):
 {{
-  "titulo": "Flashcards — {req.subject}",
+  "titulo": "Flashcards — {req.subject}{week_note}",
   "cards": [
-    {{"id": 1, "frente": "conceito ou pergunta", "verso": "definição ou resposta completa", "categoria": "categoria"}}
+    {{"id": 1, "frente": "Conceito ou termo real do conteúdo", "verso": "Definição ou explicação baseada no texto extraído", "categoria": "categoria do autoestudo"}}
   ]
 }}""",
     }
