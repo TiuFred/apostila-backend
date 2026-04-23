@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -28,6 +28,10 @@ app.add_middleware(CORSMiddleware,
 
 api_key = os.environ.get("ANTHROPIC_API_KEY")
 client = anthropic.Anthropic(api_key=api_key)
+
+def get_client():
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    return anthropic.Anthropic(api_key=key)
 
 SUBJECT_COLORS = {
     "#7C6AF7": colors.HexColor("#7C6AF7"),
@@ -79,13 +83,30 @@ class GenerateRequest(BaseModel):
     items: List[dict]
 
 def call_claude(prompt: str, system: str = "") -> str:
-    msg = client.messages.create(
+    c = get_client()
+    msg = c.messages.create(
         model="claude-opus-4-5",
         max_tokens=4096,
         system=system or "Você é um assistente educacional especialista em criar materiais de estudo didáticos e bem estruturados em português brasileiro.",
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text
+
+@app.post("/extract-pdf")
+async def extract_pdf(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        import io as _io
+        from pypdf import PdfReader as _PdfReader
+        reader = _PdfReader(_io.BytesIO(contents))
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        text = re.sub(r'\s+', ' ', text).strip()
+        return {"content": text[:6000], "pages": len(reader.pages)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.post("/generate")
 async def generate(req: GenerateRequest):
