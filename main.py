@@ -19,7 +19,12 @@ from reportlab.pdfgen import canvas as pdfcanvas
 import anthropic
 
 app = FastAPI()
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 api_key = os.environ.get("ANTHROPIC_API_KEY")
 client = anthropic.Anthropic(api_key=api_key)
