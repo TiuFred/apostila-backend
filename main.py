@@ -16,7 +16,7 @@ from reportlab.platypus import (
 from reportlab.graphics.shapes import Drawing, Rect, String, Line, Circle
 from reportlab.graphics import renderPDF
 from reportlab.pdfgen import canvas as pdfcanvas
-import anthropic
+import google.generativeai as genai
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware,
@@ -26,12 +26,28 @@ app.add_middleware(CORSMiddleware,
     allow_headers=["*"],
 )
 
-api_key = os.environ.get("ANTHROPIC_API_KEY")
-client = anthropic.Anthropic(api_key=api_key)
+from fastapi.responses import JSONResponse
+from fastapi.requests import Request
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    )
+
+api_key = os.environ.get("GEMINI_API_KEY")
+genai.configure(api_key=api_key)
 
 def get_client():
-    key = os.environ.get("ANTHROPIC_API_KEY")
-    return anthropic.Anthropic(api_key=key)
+    key = os.environ.get("GEMINI_API_KEY")
+    genai.configure(api_key=key)
+    return genai.GenerativeModel("gemini-1.5-flash")
 
 SUBJECT_COLORS = {
     "#7C6AF7": colors.HexColor("#7C6AF7"),
@@ -74,7 +90,7 @@ async def scrape(req: ScrapeRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ─── Claude AI ────────────────────────────────────────────────────────────────
+# ─── Gemini AI ────────────────────────────────────────────────────────────────
 
 class GenerateRequest(BaseModel):
     mode: str
@@ -82,15 +98,11 @@ class GenerateRequest(BaseModel):
     subject_color: str
     items: List[dict]
 
-def call_claude(prompt: str, system: str = "") -> str:
-    c = get_client()
-    msg = c.messages.create(
-        model="claude-opus-4-5",
-        max_tokens=4096,
-        system=system or "Você é um assistente educacional especialista em criar materiais de estudo didáticos e bem estruturados em português brasileiro.",
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return msg.content[0].text
+def call_gemini(prompt: str, system: str = "") -> str:
+    model = get_client()
+    full_prompt = f"{system}\n\n{prompt}" if system else prompt
+    response = model.generate_content(full_prompt)
+    return response.text
 
 @app.post("/extract-pdf")
 async def extract_pdf(file: UploadFile = File(...)):
@@ -99,6 +111,24 @@ async def extract_pdf(file: UploadFile = File(...)):
         import io as _io
         from pypdf import PdfReader as _PdfReader
         reader = _PdfReader(_io.BytesIO(contents))
+        text = ""
+        for page in reader.pages:
+            text += page.extract_text() or ""
+        text = re.sub(r'\s+', ' ', text).strip()
+        return {"content": text[:6000], "pages": len(reader.pages)}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+class ExtractPDFBase64Request(BaseModel):
+    data: str  # base64 encoded PDF
+
+@app.post("/extract-pdf-b64")
+async def extract_pdf_b64(req: ExtractPDFBase64Request):
+    try:
+        import base64, io as _io
+        from pypdf import PdfReader as _PdfReader
+        raw = base64.b64decode(req.data)
+        reader = _PdfReader(_io.BytesIO(raw))
         text = ""
         for page in reader.pages:
             text += page.extract_text() or ""
@@ -208,7 +238,8 @@ Retorne JSON:
 Retorne SOMENTE o JSON.""",
     }
 
-    raw = call_claude(prompts[req.mode])
+    system = "Você é um assistente educacional especialista em criar materiais de estudo didáticos e bem estruturados em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional."
+    raw = call_gemini(prompts[req.mode], system)
     raw = re.sub(r"```json\s*", "", raw)
     raw = re.sub(r"```\s*", "", raw)
     raw = raw.strip()
