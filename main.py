@@ -254,16 +254,20 @@ async def generate(req: GenerateRequest):
     weeks = sorted(set(i["week"] for i in req.items if i.get("week")))
     week_note = f" (Semanas: {', '.join(weeks)})" if weeks else ""
 
-    base_instruction = f"""Você é um assistente educacional responsável por gerar materiais didáticos estruturados e de alta qualidade.
+    base_instruction = f"""Você é um assistente educacional especialista, responsável por gerar materiais didáticos de alta qualidade.
 
-Contexto obrigatório:
-* Utilize EXCLUSIVAMENTE as informações presentes nos conteúdos extraídos dos autoestudos fornecidos.
-* NÃO utilize conhecimento externo, memória prévia ou exemplos genéricos fora do conteúdo fornecido.
-* NÃO invente conceitos, definições ou informações que não estejam explícitas ou claramente inferíveis a partir do material.
-* Priorize sempre o "Conteúdo extraído" como fonte principal.
-* Utilize "Instruções do usuário" para direcionar foco, profundidade ou formato.
-* NÃO copie trechos literalmente sem adaptação. Reescreva de forma didática, clara e organizada.
-* Estruture o conteúdo de maneira lógica e progressiva (do simples ao mais complexo).
+Fontes de conhecimento:
+* Utilize o "Conteúdo extraído" dos autoestudos como BASE PRINCIPAL e ponto de partida.
+* AMPLIE e APROFUNDE com seu próprio conhecimento especializado sobre os temas abordados.
+* Conecte o conteúdo fornecido com conceitos relacionados, exemplos reais, contexto e aplicações práticas.
+* Quando o conteúdo extraído for limitado, use seu conhecimento para enriquecer o material.
+* Priorize "Instruções do usuário" para direcionar foco, profundidade ou formato.
+
+Transformação didática:
+* NÃO copie trechos literalmente — reescreva de forma didática, clara e aprofundada.
+* Estruture de forma lógica e progressiva (do simples ao mais complexo).
+* Adicione exemplos práticos, analogias e conexões com o mundo real.
+* Use linguagem acessível mas precisa tecnicamente.
 
 Matéria: {req.subject}{week_note}
 Autoestudos selecionados: {names}
@@ -273,233 +277,177 @@ Autoestudos selecionados: {names}
 
     prompts = {
         "apostila": base_instruction + f"""
-Agora gere uma apostila didática completa, estruturada e aprofundada com base EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere uma apostila didática completa, estruturada e aprofundada.
 
 Objetivo:
-* Cobrir integralmente todos os autoestudos da semana.
-* Garantir que nenhum conteúdo relevante seja omitido.
+* Usar o conteúdo dos autoestudos como base e AMPLIAR com conhecimento próprio.
+* Cobrir integralmente todos os temas, enriquecendo com contexto, exemplos e aplicações reais.
 * Organizar o material de forma progressiva e pedagógica.
 
 Regras:
-* NÃO utilizar conhecimento externo. NÃO inventar conteúdo. NÃO escrever de forma genérica.
-* Cada seção deve estar ancorada em pelo menos um autoestudo.
+* Cada seção deve partir do conteúdo fornecido e ser expandida com profundidade e exemplos do mundo real.
 * Cada seção deve ter no mínimo 3 parágrafos completos e explicativos.
 * Os "topicos" devem resumir os pontos-chave de forma objetiva.
-* O "exemplo" deve ser prático e diretamente relacionado ao conteúdo (não genérico).
+* O "exemplo" deve ser prático, concreto e enriquecido com situações reais.
 * NÃO repita conteúdo entre seções.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "titulo": "Título claro e representativo da semana",
-  "introducao": "2 a 3 parágrafos conectando os principais temas da semana",
+  "introducao": "2 a 3 parágrafos conectando os principais temas com contexto amplo",
   "secoes": [
-    {{
-      "titulo": "Título baseado diretamente nos conceitos do conteúdo",
-      "conteudo": "Explicação aprofundada com no mínimo 3 parágrafos",
+    {{{{
+      "titulo": "Título baseado nos conceitos do conteúdo",
+      "conteudo": "Explicação aprofundada com no mínimo 3 parágrafos, enriquecida com conhecimento especializado",
       "topicos": ["ponto-chave 1", "ponto-chave 2", "ponto-chave 3"],
-      "exemplo": "Exemplo prático diretamente relacionado ao conteúdo"
-    }}
+      "exemplo": "Exemplo prático e concreto do mundo real"
+    }}}}
   ],
-  "resumo": "Síntese final conectando todos os temas da apostila",
+  "resumo": "Síntese final conectando todos os temas com visão ampla",
   "referencias": ["Nome de cada autoestudo utilizado"]
-}}""",
+}}}}""",
 
         "mapa": base_instruction + f"""
-Agora gere um mapa mental estruturado, hierárquico e completo com base EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere um mapa mental estruturado, hierárquico e completo.
 
 Objetivo:
 * Representar visualmente os principais conceitos da semana.
-* Cobrir todos os autoestudos de forma equilibrada.
+* Partir do conteúdo fornecido e enriquecer com conceitos relacionados e conexões relevantes do seu conhecimento.
 
 Regras:
-* NÃO usar termos genéricos (ex: "conceitos importantes", "visão geral").
-* TODOS os títulos e itens devem derivar diretamente do conteúdo.
-* O campo "centro" deve representar o tema principal (não genérico).
-* Crie entre 4 e 6 ramos principais.
-* Cada ramo deve conter entre 2 e 4 subramos.
-* Cada subramo deve conter entre 2 e 4 itens com frases curtas e informativas.
-* Evite redundância entre ramos.
-* Cores disponíveis: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7
+* NÃO usar termos genéricos. O campo "centro" deve ser específico.
+* Crie entre 4 e 6 ramos principais, cada um com 2-4 subramos e 2-4 itens.
+* Enriqueça com conexões e conceitos complementares.
+* Cores: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "centro": "Tema central baseado no conteúdo",
   "ramos": [
-    {{
-      "titulo": "Conceito específico do conteúdo",
+    {{{{
+      "titulo": "Conceito específico",
       "cor": "#22C9A0",
       "subramos": [
-        {{
+        {{{{
           "titulo": "Subtópico específico",
           "itens": ["detalhe relevante", "outro detalhe"]
-        }}
+        }}}}
       ]
-    }}
+    }}}}
   ]
-}}""",
+}}}}""",
 
         "objetiva": base_instruction + f"""
-Agora gere um simulado com 12 questões objetivas de alta qualidade, baseadas EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere um simulado com 12 questões objetivas de alta qualidade.
 
-Distribuição obrigatória:
-* Total: 12 questões — 4 Fácil, 5 Média, 3 Difícil
-* Mínimo de 3 questões do tipo somatório
-* NÃO repetir conceitos entre questões
+Distribuição: 12 questões — 4 Fácil, 5 Média, 3 Difícil. Mínimo 3 somatório.
+Use o conteúdo como base e APROFUNDE com seu conhecimento para questões mais ricas.
 
-Tipo 1 — Tradicional (A–E):
-* Apenas uma alternativa correta
-* Distratores plausíveis e baseados no conteúdo
+Tipo 1 — Tradicional (A–E): uma alternativa correta, distratores plausíveis e tecnicamente fundamentados.
 
-Tipo 2 — Somatório (potências de 2):
-* Apresente 3 a 5 afirmativas numeradas: I, II, III, IV, V
-* Valores: I=1, II=2, III=4, IV=8, V=16
-* Alternativas são somas: ex: a)1 b)3 c)5 d)7 e)15
-* Misturar verdadeiras e falsas — sem padrão óbvio
-* A resposta deve ser EXATAMENTE a soma correta
-* NÃO pode haver ambiguidade nas afirmativas
-
-Qualidade: enunciados claros, justificativas baseadas no conteúdo, sem pegadinhas ruins.
+Tipo 2 — Somatório: afirmativas I,II,III,IV,V com valores 1,2,4,8,16.
+As alternativas são as possíveis somas. Resposta = soma exata das verdadeiras.
+Misturar V e F sem padrão óbvio.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "titulo": "Simulado Objetiva — {req.subject}{week_note}",
   "questoes": [
-    {{
+    {{{{
       "numero": 1,
       "tipo": "tradicional",
       "enunciado": "...",
-      "alternativas": {{"a": "...", "b": "...", "c": "...", "d": "...", "e": "..."}},
+      "alternativas": {{{{"a": "...", "b": "...", "c": "...", "d": "...", "e": "..."}}}},
       "resposta": "a",
-      "justificativa": "...",
+      "justificativa": "Explicação técnica aprofundada...",
       "dificuldade": "Fácil"
-    }},
-    {{
+    }}}},
+    {{{{
       "numero": 2,
       "tipo": "somatorio",
       "enunciado": "Analise as afirmativas:",
       "afirmacoes": ["I. ...", "II. ...", "III. ..."],
-      "alternativas": {{"a": "1", "b": "3", "c": "5", "d": "7", "e": "15"}},
+      "alternativas": {{{{"a": "1", "b": "3", "c": "5", "d": "7", "e": "15"}}}},
       "resposta": "c",
       "justificativa": "I (V)=1, II (F)=0, III (V)=4 → Soma = 5",
       "dificuldade": "Média"
-    }}
+    }}}}
   ]
-}}""",
+}}}}""",
 
         "dissertativa": base_instruction + f"""
-Agora gere 6 questões dissertativas de alta qualidade, baseadas EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere 6 questões dissertativas de alta qualidade.
 
 Distribuição: 2 Fácil, 3 Média, 1 Difícil
-Valores: Fácil=1,0 a 1,5 | Média=2,0 a 2,5 | Difícil=3,0 a 4,0
+Valores: Fácil=1,0-1,5 | Média=2,0-2,5 | Difícil=3,0-4,0
+Use o conteúdo como base e APROFUNDE com conhecimento especializado.
 
-Tipos obrigatoriamente variados:
-* Explicação estruturada | Comparação entre conceitos | Aplicação prática | Análise/justificativa | Integração de conceitos
-
-Regras:
-* NÃO usar conhecimento externo. NÃO inventar. NÃO citar instituições específicas.
-* NÃO repetir conceito central entre questões. NÃO criar perguntas genéricas como "O que é X?" isoladamente.
-* Enunciado claro, específico, indicando: explique/compare/analise/aplique/justifique/relacione.
-* Gabarito: resposta modelo completa, fiel ao conteúdo, orientada para correção.
-* Critérios de correção com pontuação que some EXATAMENTE o valor total da questão.
+Tipos variados: Explicação | Comparação | Aplicação prática | Análise | Integração de conceitos
+Gabarito: resposta modelo completa e tecnicamente aprofundada.
+Critérios com pontuação que some EXATAMENTE o valor total.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "titulo": "Simulado Dissertativo — {req.subject}{week_note}",
   "questoes": [
-    {{
+    {{{{
       "numero": 1,
       "enunciado": "...",
       "valor": "2,0",
-      "gabarito": "...",
+      "gabarito": "Resposta modelo aprofundada...",
       "pontos_chave": ["critério 1", "critério 2", "critério 3"],
       "criterio_correcao_detalhado": [
-        {{"criterio": "Domínio conceitual", "pontuacao": "0,8", "descricao": "..."}},
-        {{"criterio": "Relação entre ideias", "pontuacao": "0,7", "descricao": "..."}},
-        {{"criterio": "Clareza e organização", "pontuacao": "0,5", "descricao": "..."}}
+        {{{{"criterio": "Domínio conceitual", "pontuacao": "0,8", "descricao": "..."}}}},
+        {{{{"criterio": "Relação entre ideias", "pontuacao": "0,7", "descricao": "..."}}}},
+        {{{{"criterio": "Clareza e organização", "pontuacao": "0,5", "descricao": "..."}}}}
       ],
       "dificuldade": "Média"
-    }}
+    }}}}
   ]
-}}""",
+}}}}""",
 
         "flashcards": base_instruction + f"""
-Agora gere 20 flashcards de alta qualidade baseados EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere 20 flashcards de alta qualidade.
 
-Objetivo: maximizar retenção ativa (active recall), cobrir todos os autoestudos, variar tipos de raciocínio.
+Objetivo: maximizar retenção ativa, enriquecer com conhecimento especializado.
 
-Tipos obrigatoriamente misturados:
-1. Definição (conceito → explicação)
-2. Pergunta direta ("Qual é a função de…?")
-3. Comparação (diferença entre X e Y)
-4. Aplicação (situação prática simples)
-5. Causa e efeito
-6. Lista estruturada (etapas, características)
+Tipos misturados: Definição | Pergunta direta | Comparação | Aplicação | Causa-efeito | Lista estruturada
 
 Regras:
-* NÃO usar conhecimento externo. NÃO inventar. NÃO copiar literalmente.
-* NÃO repetir conceitos entre cards. Evitar cards genéricos ou triviais.
-* Frente: exige pensamento, clara e específica.
-* Verso: direto mas completo, com mini-exemplo ou contexto quando possível.
-* Categorias devem refletir temas reais do conteúdo (não "geral").
-* Distribuir cards entre TODOS os autoestudos.
-* Gerar EXATAMENTE 20 cards.
+* Use o conteúdo como base e ENRIQUEÇA com exemplos reais e detalhes técnicos.
+* NÃO repetir conceitos. Verso deve ter mini-exemplo ou contexto prático.
+* Gerar EXATAMENTE 20 cards com categorias temáticas reais.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "titulo": "Flashcards — {req.subject}{week_note}",
   "cards": [
-    {{
+    {{{{
       "id": 1,
       "tipo": "definicao",
       "frente": "O que é [conceito]?",
-      "verso": "Explicação clara baseada no conteúdo...",
+      "verso": "Explicação aprofundada com exemplo prático...",
       "categoria": "Nome do tema"
-    }}
+    }}}}
   ]
-}}""",
+}}}}""",
 
         "desespero": base_instruction + f"""
-Agora gere um resumo final de revisão intensiva chamado "Desespero para Prova", baseado EXCLUSIVAMENTE nos conteúdos fornecidos.
+Agora gere um resumo de revisão intensiva "Desespero para Prova".
 
-Objetivo:
-* Permitir revisão rápida e eficiente antes da prova
-* Consolidar os conceitos mais importantes
-* Destacar o que mais tem chance de cair
-* Maximizar retenção em pouco tempo
-
-Estilo: altamente direto, frases curtas, formato escaneável, palavras-chave, ZERO enrolação.
-
-Estrutura obrigatória:
-1. principais_conceitos — conceitos mais importantes com definição curta (1-2 linhas cada)
-2. o_que_mais_cai — pontos com maior probabilidade de cobrança
-3. pegadinhas — diferenças entre conceitos parecidos, erros comuns, armadilhas conceituais
-4. relacoes_importantes — conexões causa→efeito, comparações diretas entre conceitos
-5. checklist_final — lista rápida para revisar mentalmente antes da prova
-
-Regras:
-* NÃO usar conhecimento externo. NÃO inventar. NÃO escrever de forma genérica.
-* Cobrir TODOS os autoestudos. NÃO repetir informação desnecessariamente.
-* Conteúdo útil para leitura em poucos minutos.
+Objetivo: revisão rápida, consolidar o mais importante, destacar o que mais cai.
+Use o conteúdo como base e adicione padrões típicos de cobrança e pegadinhas clássicas da área.
+Estilo: direto, frases curtas, escaneável, ZERO enrolação.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{
+{{{{
   "titulo": "Desespero para Prova — {req.subject}{week_note}",
-  "principais_conceitos": [
-    "Conceito: definição curta em 1-2 linhas"
-  ],
-  "o_que_mais_cai": [
-    "Ponto importante baseado no conteúdo"
-  ],
-  "pegadinhas": [
-    "Erro comum ou confusão conceitual"
-  ],
-  "relacoes_importantes": [
-    "Conceito A → efeito ou relação com B"
-  ],
-  "checklist_final": [
-    "Item essencial para revisar"
-  ]
-}}""",
+  "principais_conceitos": ["Conceito: definição curta em 1-2 linhas"],
+  "o_que_mais_cai": ["Ponto importante com alta probabilidade de cobrança"],
+  "pegadinhas": ["Erro comum ou confusão conceitual clássica do tema"],
+  "relacoes_importantes": ["Conceito A → efeito ou relação com B"],
+  "checklist_final": ["Item essencial para revisar"]
+}}}}""",
     }
 
     if req.mode not in prompts:
