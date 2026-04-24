@@ -138,6 +138,14 @@ def upload_to_drive(pdf_path: str, subject: str, weeks: list, mode: str) -> str:
 
 
 app = FastAPI()
+
+# Allow large request bodies (up to 50MB) for PDF uploads
+from starlette.middleware.base import BaseHTTPMiddleware
+class LimitUploadSize(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        request._body_size_limit = 50 * 1024 * 1024  # 50MB
+        return await call_next(request)
+app.add_middleware(LimitUploadSize)
 app.add_middleware(CORSMiddleware,
     allow_origins=["*"],
     allow_credentials=False,
