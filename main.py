@@ -176,7 +176,38 @@ def call_ai(prompt: str) -> str:
 def health():
     return {"ok": True}
 
-# ── Scraping ──────────────────────────────────────────────────────────────────
+# ── Credits ────────────────────────────────────────────────────────────────────
+
+@app.get("/credits")
+async def get_credits():
+    try:
+        import httpx as _httpx
+        api_key = os.environ.get("ANTHROPIC_API_KEY","")
+        async with _httpx.AsyncClient(timeout=10) as c:
+            r = await c.get(
+                "https://api.anthropic.com/v1/organizations/credits/balance",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "anthropic-beta": "account-management-2025-02-19",
+                }
+            )
+        if r.status_code == 200:
+            data = r.json()
+            # balance is in cents
+            balance_cents = data.get("total_balance", 0)
+            balance_usd = balance_cents / 100
+            return {
+                "balance_usd": round(balance_usd, 4),
+                "balance_display": f"${balance_usd:.2f}",
+                "balance_cents": balance_cents,
+            }
+        else:
+            # Fallback: try usage endpoint
+            return {"balance_usd": None, "error": f"Status {r.status_code}", "raw": r.text[:200]}
+    except Exception as e:
+        return {"balance_usd": None, "error": str(e)}
+
 
 class ScrapeRequest(BaseModel):
     url: str
