@@ -163,8 +163,8 @@ def call_ai(prompt: str) -> str:
     client = get_client()
     msg = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=4096,
-        system="Você é um assistente educacional especialista em criar materiais de estudo didáticos em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional.",
+        max_tokens=8192,
+        system="Você é um assistente educacional especialista em criar materiais de estudo didáticos em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional. Seja conciso nos textos para garantir que o JSON fique completo.",
         messages=[{"role": "user", "content": prompt}],
     )
     return msg.content[0].text
@@ -355,10 +355,26 @@ Retorne JSON (somente JSON, sem markdown):
     raw = re.sub(r"```json\s*", "", raw)
     raw = re.sub(r"```\s*", "", raw)
     raw = raw.strip()
+
+    # Try to parse; if truncated, attempt to close open JSON
     try:
         data = json.loads(raw)
     except Exception:
-        raise HTTPException(status_code=500, detail=f"Erro ao parsear JSON: {raw[:200]}")
+        # Try to repair truncated JSON by closing open structures
+        repaired = raw
+        # Count open braces/brackets and close them
+        open_braces   = repaired.count("{") - repaired.count("}")
+        open_brackets  = repaired.count("[") - repaired.count("]")
+        # Remove trailing comma if any
+        repaired = re.sub(r',\s*$', '', repaired.rstrip())
+        # Close open arrays first, then objects
+        repaired += "]" * max(0, open_brackets)
+        repaired += "}" * max(0, open_braces)
+        try:
+            data = json.loads(repaired)
+        except Exception:
+            raise HTTPException(status_code=500, detail=f"Erro ao parsear JSON: {raw[:300]}")
+
     return {"mode": req.mode, "data": data}
 
 # ── PDF Generation ────────────────────────────────────────────────────────────
