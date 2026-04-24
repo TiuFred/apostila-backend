@@ -17,8 +17,89 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas as pdfcanvas
 from pypdf import PdfReader, PdfWriter
 import anthropic
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload, MediaIoBaseUpload
+from google.oauth2 import service_account
 
-# ── App setup ─────────────────────────────────────────────────────────────────
+# ── Google Drive setup ────────────────────────────────────────────────────────
+
+DRIVE_ROOT_FOLDER = "1eGYQXjtJ0gUSxqD6WHZbHBuiXFpcxEGv"
+
+SUBJECT_SIGLAS = {
+    "Programação": "COM",
+    "UX":          "UX",
+    "Orientação":  "ORI",
+    "Liderança":   "LID",
+    "Negócios":    "NEG",
+    "Matemática":  "MAT",
+}
+
+MODE_LABELS = {
+    "apostila":     "Apostila",
+    "mapa":         "MapaMental",
+    "objetiva":     "SimuladoObj",
+    "dissertativa": "SimuladoDiss",
+    "flashcards":   "Flashcards",
+}
+
+def get_drive_service():
+    """Build Drive service from env var (JSON string) or file."""
+    creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if creds_json:
+        info = json.loads(creds_json)
+    else:
+        raise Exception("GOOGLE_SERVICE_ACCOUNT_JSON não configurada")
+    creds = service_account.Credentials.from_service_account_info(
+        info, scopes=["https://www.googleapis.com/auth/drive"]
+    )
+    return build("drive", "v3", credentials=creds)
+
+def get_or_create_folder(service, name: str, parent_id: str) -> str:
+    """Return folder ID, creating it if it doesn't exist."""
+    q = f"name='{name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
+    res = service.files().list(q=q, fields="files(id,name)").execute()
+    files = res.get("files", [])
+    if files:
+        return files[0]["id"]
+    meta = {
+        "name": name,
+        "mimeType": "application/vnd.google-apps.folder",
+        "parents": [parent_id],
+    }
+    folder = service.files().create(body=meta, fields="id").execute()
+    return folder["id"]
+
+def upload_to_drive(pdf_path: str, subject: str, weeks: list, mode: str) -> str:
+    """Upload PDF to Drive under Subject > Week(s) folder. Returns file URL."""
+    service  = get_drive_service()
+    sigla    = SUBJECT_SIGLAS.get(subject, subject[:3].upper())
+    mode_lbl = MODE_LABELS.get(mode, mode.capitalize())
+
+    # Subject folder
+    subject_folder = get_or_create_folder(service, subject, DRIVE_ROOT_FOLDER)
+
+    # Week folder — if multiple weeks, use combined name e.g. "Semana 01-03"
+    if len(weeks) == 1:
+        week_name = weeks[0]
+    else:
+        nums = [w.replace("Semana ", "").strip() for w in sorted(weeks)]
+        week_name = f"Semana {'-'.join(nums)}"
+
+    week_folder = get_or_create_folder(service, week_name, subject_folder)
+
+    # File name: Apostila(S-01, M-COM).pdf
+    week_num = week_name.replace("Semana ", "").strip()
+    file_name = f"{mode_lbl}(S-{week_num}, M-{sigla}).pdf"
+
+    # Upload
+    media = MediaFileUpload(pdf_path, mimetype="application/pdf", resumable=False)
+    file_meta = {"name": file_name, "parents": [week_folder]}
+    uploaded = service.files().create(
+        body=file_meta, media_body=media, fields="id,webViewLink"
+    ).execute()
+
+    return uploaded.get("webViewLink", "")
+
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware,
@@ -516,3 +597,38 @@ async def make_pdf(req: PDFRequest):
     except Exception as e:
         raise HTTPException(500, str(e))
     return FileResponse(fname, media_type="application/pdf", filename=os.path.basename(fname))
+
+# ── Google Drive Upload ────────────────────────────────────────────────────────
+
+class DriveUploadRequest(BaseModel):
+    mode: str
+    subject: str
+    subject_color: str
+    weeks: List[str]
+    data: dict
+
+@app.post("/upload-drive")
+async def upload_drive(req: DriveUploadRequest):
+    # 1. Generate PDF first
+    fname = f"/tmp/drive_{req.mode}_{req.subject.replace(' ','_')}.pdf"
+    try:
+        if req.mode == "apostila":
+            build_apostila_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode == "mapa":
+            build_mapa_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode in ("objetiva","dissertativa"):
+            build_simulado_pdf(fname, req.subject, req.subject_color, req.data, req.mode)
+        elif req.mode == "flashcards":
+            build_flashcards_pdf(fname, req.subject, req.subject_color, req.data)
+        else:
+            raise HTTPException(400, "Modo inválido")
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao gerar PDF: {e}")
+
+    # 2. Upload to Drive
+    try:
+        link = upload_to_drive(fname, req.subject, req.weeks, req.mode)
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao enviar para o Drive: {e}")
+
+    return {"link": link, "message": "Arquivo enviado com sucesso!"}
