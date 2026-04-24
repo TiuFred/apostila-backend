@@ -160,7 +160,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 def get_client():
     return anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-def call_ai(prompt: str) -> str:
+def call_ai(prompt: str, mode: str = "", subject: str = "") -> str:
     client = get_client()
     msg = client.messages.create(
         model="claude-opus-4-5",
@@ -168,6 +168,9 @@ def call_ai(prompt: str) -> str:
         system="Você é um assistente educacional especialista em criar materiais de estudo didáticos em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional. Seja conciso nos textos para garantir que o JSON fique completo.",
         messages=[{"role": "user", "content": prompt}],
     )
+    # Log usage asynchronously
+    if mode:
+        log_usage(mode, subject, msg.usage.input_tokens, msg.usage.output_tokens)
     return msg.content[0].text
 
 # ── Health ─────────────────────────────────────────────────────────────────────
@@ -180,33 +183,57 @@ def health():
 
 @app.get("/credits")
 async def get_credits():
+    """Return accumulated usage from Supabase usage_log."""
     try:
         import httpx as _httpx
-        api_key = os.environ.get("ANTHROPIC_API_KEY","")
+        supa_url = os.environ.get("SUPABASE_URL","")
+        supa_key = os.environ.get("SUPABASE_SERVICE_KEY","")
+        if not supa_url or not supa_key:
+            return {"total_cost": 0, "total_input_tokens": 0, "total_output_tokens": 0, "calls": 0}
         async with _httpx.AsyncClient(timeout=10) as c:
             r = await c.get(
-                "https://api.anthropic.com/v1/organizations/credits/balance",
+                f"{supa_url}/rest/v1/usage_log?select=input_tokens,output_tokens,cost_usd",
                 headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                    "anthropic-beta": "account-management-2025-02-19",
+                    "apikey": supa_key,
+                    "Authorization": f"Bearer {supa_key}",
                 }
             )
         if r.status_code == 200:
-            data = r.json()
-            # balance is in cents
-            balance_cents = data.get("total_balance", 0)
-            balance_usd = balance_cents / 100
+            rows = r.json()
+            total_cost  = sum(float(row.get("cost_usd") or 0) for row in rows)
+            total_in    = sum(int(row.get("input_tokens") or 0) for row in rows)
+            total_out   = sum(int(row.get("output_tokens") or 0) for row in rows)
             return {
-                "balance_usd": round(balance_usd, 4),
-                "balance_display": f"${balance_usd:.2f}",
-                "balance_cents": balance_cents,
+                "total_cost": round(total_cost, 4),
+                "total_input_tokens": total_in,
+                "total_output_tokens": total_out,
+                "calls": len(rows),
             }
-        else:
-            # Fallback: try usage endpoint
-            return {"balance_usd": None, "error": f"Status {r.status_code}", "raw": r.text[:200]}
+        return {"total_cost": 0, "total_input_tokens": 0, "total_output_tokens": 0, "calls": 0}
     except Exception as e:
-        return {"balance_usd": None, "error": str(e)}
+        return {"total_cost": 0, "error": str(e)}
+
+def log_usage(mode: str, subject: str, input_tokens: int, output_tokens: int):
+    """Log token usage to Supabase asynchronously."""
+    try:
+        import threading, requests as req_lib
+        # Claude Opus pricing: $15/M input, $75/M output
+        cost = (input_tokens / 1_000_000 * 15) + (output_tokens / 1_000_000 * 75)
+        supa_url = os.environ.get("SUPABASE_URL","")
+        supa_key = os.environ.get("SUPABASE_SERVICE_KEY","")
+        if not supa_url or not supa_key: return
+        def _post():
+            try:
+                req_lib.post(
+                    f"{supa_url}/rest/v1/usage_log",
+                    json={"mode": mode, "subject": subject, "input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": round(cost, 6)},
+                    headers={"apikey": supa_key, "Authorization": f"Bearer {supa_key}", "Content-Type": "application/json"},
+                    timeout=5
+                )
+            except: pass
+        threading.Thread(target=_post, daemon=True).start()
+    except: pass
+
 
 
 class ScrapeRequest(BaseModel):
@@ -484,7 +511,7 @@ Retorne exatamente este JSON (somente JSON, sem markdown):
     if req.mode not in prompts:
         raise HTTPException(status_code=400, detail="Modo inválido")
 
-    raw = call_ai(prompts[req.mode])
+    raw = call_ai(prompts[req.mode], mode=req.mode, subject=req.subject)
     raw = re.sub(r"```json\s*", "", raw)
     raw = re.sub(r"```\s*", "", raw)
     raw = raw.strip()
