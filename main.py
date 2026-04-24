@@ -220,7 +220,7 @@ async def extract_pdf_b64(req: ExtractPDFRequest):
                 pages_text.append(f"[Página {i+1}]\n{text}")
         full_text = "\n\n".join(pages_text)
         # Return up to 15000 chars (covers most academic PDFs fully)
-        return {"content": full_text[:15000], "pages": len(reader.pages), "chars": len(full_text)}
+        return {"content": full_text[:50000], "pages": len(reader.pages), "chars": len(full_text)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -243,7 +243,7 @@ async def generate(req: GenerateRequest):
         if i.get("notes"):
             block += f"\nInstruções do usuário: {i['notes']}"
         if i.get("scraped_content"):
-            block += f"\nConteúdo extraído:\n{i['scraped_content'][:4000]}"
+            block += f"\nConteúdo extraído:\n{i['scraped_content'][:10000]}"
         elif i.get("url"):
             block += f"\nURL: {i['url']}"
         item_blocks.append(block)
