@@ -212,11 +212,15 @@ async def extract_pdf_b64(req: ExtractPDFRequest):
     try:
         raw = base64.b64decode(req.data)
         reader = PdfReader(io.BytesIO(raw))
-        text = ""
-        for page in reader.pages:
-            text += page.extract_text() or ""
-        text = re.sub(r'\s+', ' ', text).strip()
-        return {"content": text[:6000], "pages": len(reader.pages)}
+        pages_text = []
+        for i, page in enumerate(reader.pages):
+            text = page.extract_text() or ""
+            text = re.sub(r'\s+', ' ', text).strip()
+            if text:
+                pages_text.append(f"[Página {i+1}]\n{text}")
+        full_text = "\n\n".join(pages_text)
+        # Return up to 15000 chars (covers most academic PDFs fully)
+        return {"content": full_text[:15000], "pages": len(reader.pages), "chars": len(full_text)}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -239,7 +243,7 @@ async def generate(req: GenerateRequest):
         if i.get("notes"):
             block += f"\nInstruções do usuário: {i['notes']}"
         if i.get("scraped_content"):
-            block += f"\nConteúdo extraído:\n{i['scraped_content'][:1200]}"
+            block += f"\nConteúdo extraído:\n{i['scraped_content'][:4000]}"
         elif i.get("url"):
             block += f"\nURL: {i['url']}"
         item_blocks.append(block)
