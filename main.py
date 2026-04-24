@@ -41,6 +41,7 @@ MODE_LABELS = {
     "objetiva":     "SimuladoObj",
     "dissertativa": "SimuladoDiss",
     "flashcards":   "Flashcards",
+    "desespero":    "DesesperaProva",
 }
 
 def get_drive_service():
@@ -239,7 +240,7 @@ async def generate(req: GenerateRequest):
     for i in req.items:
         block = f"### Autoestudo: {i['title']}"
         if i.get("week"):
-            block += f" ({i['week']})"
+            block += f" (Semana {i['week']})"
         if i.get("notes"):
             block += f"\nInstruções do usuário: {i['notes']}"
         if i.get("scraped_content"):
@@ -253,7 +254,16 @@ async def generate(req: GenerateRequest):
     weeks = sorted(set(i["week"] for i in req.items if i.get("week")))
     week_note = f" (Semanas: {', '.join(weeks)})" if weeks else ""
 
-    base_instruction = f"""Você é um assistente educacional. Crie o material EXCLUSIVAMENTE com base nos conteúdos abaixo dos autoestudos fornecidos. NÃO invente conteúdo genérico. Use apenas o que está presente nos textos extraídos e nas instruções do usuário. Se um autoestudo não tiver conteúdo extraído, use o título como referência temática.
+    base_instruction = f"""Você é um assistente educacional responsável por gerar materiais didáticos estruturados e de alta qualidade.
+
+Contexto obrigatório:
+* Utilize EXCLUSIVAMENTE as informações presentes nos conteúdos extraídos dos autoestudos fornecidos.
+* NÃO utilize conhecimento externo, memória prévia ou exemplos genéricos fora do conteúdo fornecido.
+* NÃO invente conceitos, definições ou informações que não estejam explícitas ou claramente inferíveis a partir do material.
+* Priorize sempre o "Conteúdo extraído" como fonte principal.
+* Utilize "Instruções do usuário" para direcionar foco, profundidade ou formato.
+* NÃO copie trechos literalmente sem adaptação. Reescreva de forma didática, clara e organizada.
+* Estruture o conteúdo de maneira lógica e progressiva (do simples ao mais complexo).
 
 Matéria: {req.subject}{week_note}
 Autoestudos selecionados: {names}
@@ -263,87 +273,231 @@ Autoestudos selecionados: {names}
 
     prompts = {
         "apostila": base_instruction + f"""
-Agora crie uma apostila didática completa e detalhada baseada EXCLUSIVAMENTE nos conteúdos acima.
+Agora gere uma apostila didática completa, estruturada e aprofundada com base EXCLUSIVAMENTE nos conteúdos fornecidos.
 
-Retorne JSON (somente JSON, sem markdown):
+Objetivo:
+* Cobrir integralmente todos os autoestudos da semana.
+* Garantir que nenhum conteúdo relevante seja omitido.
+* Organizar o material de forma progressiva e pedagógica.
+
+Regras:
+* NÃO utilizar conhecimento externo. NÃO inventar conteúdo. NÃO escrever de forma genérica.
+* Cada seção deve estar ancorada em pelo menos um autoestudo.
+* Cada seção deve ter no mínimo 3 parágrafos completos e explicativos.
+* Os "topicos" devem resumir os pontos-chave de forma objetiva.
+* O "exemplo" deve ser prático e diretamente relacionado ao conteúdo (não genérico).
+* NÃO repita conteúdo entre seções.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
 {{
-  "titulo": "Apostila de {req.subject}{week_note}",
-  "introducao": "2-3 parágrafos introdutórios baseados no conteúdo real dos autoestudos",
+  "titulo": "Título claro e representativo da semana",
+  "introducao": "2 a 3 parágrafos conectando os principais temas da semana",
   "secoes": [
     {{
-      "titulo": "Título da seção (derivado do conteúdo real)",
-      "conteudo": "Conteúdo explicativo detalhado extraído dos autoestudos (mínimo 3 parágrafos)",
-      "topicos": ["tópico concreto 1", "tópico concreto 2", "tópico concreto 3"],
-      "exemplo": "Exemplo prático baseado no conteúdo real"
+      "titulo": "Título baseado diretamente nos conceitos do conteúdo",
+      "conteudo": "Explicação aprofundada com no mínimo 3 parágrafos",
+      "topicos": ["ponto-chave 1", "ponto-chave 2", "ponto-chave 3"],
+      "exemplo": "Exemplo prático diretamente relacionado ao conteúdo"
     }}
   ],
-  "resumo": "Resumo final baseado no que foi abordado nos autoestudos",
-  "referencias": ["título e fonte de cada autoestudo"]
+  "resumo": "Síntese final conectando todos os temas da apostila",
+  "referencias": ["Nome de cada autoestudo utilizado"]
 }}""",
 
         "mapa": base_instruction + f"""
-Agora crie um mapa mental estruturado baseado EXCLUSIVAMENTE nos conteúdos acima.
+Agora gere um mapa mental estruturado, hierárquico e completo com base EXCLUSIVAMENTE nos conteúdos fornecidos.
 
-Retorne JSON (somente JSON, sem markdown):
+Objetivo:
+* Representar visualmente os principais conceitos da semana.
+* Cobrir todos os autoestudos de forma equilibrada.
+
+Regras:
+* NÃO usar termos genéricos (ex: "conceitos importantes", "visão geral").
+* TODOS os títulos e itens devem derivar diretamente do conteúdo.
+* O campo "centro" deve representar o tema principal (não genérico).
+* Crie entre 4 e 6 ramos principais.
+* Cada ramo deve conter entre 2 e 4 subramos.
+* Cada subramo deve conter entre 2 e 4 itens com frases curtas e informativas.
+* Evite redundância entre ramos.
+* Cores disponíveis: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
 {{
-  "centro": "{req.subject}{week_note}",
+  "centro": "Tema central baseado no conteúdo",
   "ramos": [
     {{
-      "titulo": "Conceito real do conteúdo",
+      "titulo": "Conceito específico do conteúdo",
       "cor": "#22C9A0",
       "subramos": [
-        {{"titulo": "Subtópico real", "itens": ["detalhe concreto 1", "detalhe concreto 2"]}}
+        {{
+          "titulo": "Subtópico específico",
+          "itens": ["detalhe relevante", "outro detalhe"]
+        }}
       ]
     }}
   ]
-}}
-Use 4-6 ramos com cores: #7C6AF7, #22C9A0, #F76A6A, #F7A83E, #4FB8F7, #D46AF7""",
+}}""",
 
         "objetiva": base_instruction + f"""
-Agora crie 12 questões de múltipla escolha baseadas EXCLUSIVAMENTE nos conteúdos acima. As questões devem testar conceitos reais presentes nos textos extraídos.
+Agora gere um simulado com 12 questões objetivas de alta qualidade, baseadas EXCLUSIVAMENTE nos conteúdos fornecidos.
 
-Retorne JSON (somente JSON, sem markdown):
+Distribuição obrigatória:
+* Total: 12 questões — 4 Fácil, 5 Média, 3 Difícil
+* Mínimo de 3 questões do tipo somatório
+* NÃO repetir conceitos entre questões
+
+Tipo 1 — Tradicional (A–E):
+* Apenas uma alternativa correta
+* Distratores plausíveis e baseados no conteúdo
+
+Tipo 2 — Somatório (potências de 2):
+* Apresente 3 a 5 afirmativas numeradas: I, II, III, IV, V
+* Valores: I=1, II=2, III=4, IV=8, V=16
+* Alternativas são somas: ex: a)1 b)3 c)5 d)7 e)15
+* Misturar verdadeiras e falsas — sem padrão óbvio
+* A resposta deve ser EXATAMENTE a soma correta
+* NÃO pode haver ambiguidade nas afirmativas
+
+Qualidade: enunciados claros, justificativas baseadas no conteúdo, sem pegadinhas ruins.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
 {{
   "titulo": "Simulado Objetiva — {req.subject}{week_note}",
   "questoes": [
     {{
       "numero": 1,
-      "enunciado": "Questão baseada em conceito real do conteúdo",
-      "alternativas": {{"a":"texto","b":"texto","c":"texto","d":"texto","e":"texto"}},
+      "tipo": "tradicional",
+      "enunciado": "...",
+      "alternativas": {{"a": "...", "b": "...", "c": "...", "d": "...", "e": "..."}},
       "resposta": "a",
-      "justificativa": "Explicação baseada no conteúdo extraído",
+      "justificativa": "...",
       "dificuldade": "Fácil"
+    }},
+    {{
+      "numero": 2,
+      "tipo": "somatorio",
+      "enunciado": "Analise as afirmativas:",
+      "afirmacoes": ["I. ...", "II. ...", "III. ..."],
+      "alternativas": {{"a": "1", "b": "3", "c": "5", "d": "7", "e": "15"}},
+      "resposta": "c",
+      "justificativa": "I (V)=1, II (F)=0, III (V)=4 → Soma = 5",
+      "dificuldade": "Média"
     }}
   ]
-}}
-Varie dificuldade: 4 Fácil, 5 Média, 3 Difícil. O gabarito deve vir por último no PDF.""",
+}}""",
 
         "dissertativa": base_instruction + f"""
-Agora crie 6 questões dissertativas baseadas EXCLUSIVAMENTE nos conteúdos acima. As questões devem exigir reflexão sobre os temas reais dos autoestudos.
+Agora gere 6 questões dissertativas de alta qualidade, baseadas EXCLUSIVAMENTE nos conteúdos fornecidos.
 
-Retorne JSON (somente JSON, sem markdown):
+Distribuição: 2 Fácil, 3 Média, 1 Difícil
+Valores: Fácil=1,0 a 1,5 | Média=2,0 a 2,5 | Difícil=3,0 a 4,0
+
+Tipos obrigatoriamente variados:
+* Explicação estruturada | Comparação entre conceitos | Aplicação prática | Análise/justificativa | Integração de conceitos
+
+Regras:
+* NÃO usar conhecimento externo. NÃO inventar. NÃO citar instituições específicas.
+* NÃO repetir conceito central entre questões. NÃO criar perguntas genéricas como "O que é X?" isoladamente.
+* Enunciado claro, específico, indicando: explique/compare/analise/aplique/justifique/relacione.
+* Gabarito: resposta modelo completa, fiel ao conteúdo, orientada para correção.
+* Critérios de correção com pontuação que some EXATAMENTE o valor total da questão.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
 {{
   "titulo": "Simulado Dissertativo — {req.subject}{week_note}",
   "questoes": [
     {{
       "numero": 1,
-      "enunciado": "Questão aberta sobre conceito real do conteúdo",
+      "enunciado": "...",
       "valor": "2,0",
-      "gabarito": "Resposta esperada baseada no conteúdo extraído",
-      "pontos_chave": ["conceito real 1", "conceito real 2", "conceito real 3"],
+      "gabarito": "...",
+      "pontos_chave": ["critério 1", "critério 2", "critério 3"],
+      "criterio_correcao_detalhado": [
+        {{"criterio": "Domínio conceitual", "pontuacao": "0,8", "descricao": "..."}},
+        {{"criterio": "Relação entre ideias", "pontuacao": "0,7", "descricao": "..."}},
+        {{"criterio": "Clareza e organização", "pontuacao": "0,5", "descricao": "..."}}
+      ],
       "dificuldade": "Média"
     }}
   ]
 }}""",
 
         "flashcards": base_instruction + f"""
-Agora crie 20 flashcards de revisão baseados EXCLUSIVAMENTE nos conteúdos acima. Cada card deve conter um conceito real presente nos textos.
+Agora gere 20 flashcards de alta qualidade baseados EXCLUSIVAMENTE nos conteúdos fornecidos.
 
-Retorne JSON (somente JSON, sem markdown):
+Objetivo: maximizar retenção ativa (active recall), cobrir todos os autoestudos, variar tipos de raciocínio.
+
+Tipos obrigatoriamente misturados:
+1. Definição (conceito → explicação)
+2. Pergunta direta ("Qual é a função de…?")
+3. Comparação (diferença entre X e Y)
+4. Aplicação (situação prática simples)
+5. Causa e efeito
+6. Lista estruturada (etapas, características)
+
+Regras:
+* NÃO usar conhecimento externo. NÃO inventar. NÃO copiar literalmente.
+* NÃO repetir conceitos entre cards. Evitar cards genéricos ou triviais.
+* Frente: exige pensamento, clara e específica.
+* Verso: direto mas completo, com mini-exemplo ou contexto quando possível.
+* Categorias devem refletir temas reais do conteúdo (não "geral").
+* Distribuir cards entre TODOS os autoestudos.
+* Gerar EXATAMENTE 20 cards.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
 {{
   "titulo": "Flashcards — {req.subject}{week_note}",
   "cards": [
-    {{"id": 1, "frente": "Conceito ou termo real do conteúdo", "verso": "Definição ou explicação baseada no texto extraído", "categoria": "categoria do autoestudo"}}
+    {{
+      "id": 1,
+      "tipo": "definicao",
+      "frente": "O que é [conceito]?",
+      "verso": "Explicação clara baseada no conteúdo...",
+      "categoria": "Nome do tema"
+    }}
+  ]
+}}""",
+
+        "desespero": base_instruction + f"""
+Agora gere um resumo final de revisão intensiva chamado "Desespero para Prova", baseado EXCLUSIVAMENTE nos conteúdos fornecidos.
+
+Objetivo:
+* Permitir revisão rápida e eficiente antes da prova
+* Consolidar os conceitos mais importantes
+* Destacar o que mais tem chance de cair
+* Maximizar retenção em pouco tempo
+
+Estilo: altamente direto, frases curtas, formato escaneável, palavras-chave, ZERO enrolação.
+
+Estrutura obrigatória:
+1. principais_conceitos — conceitos mais importantes com definição curta (1-2 linhas cada)
+2. o_que_mais_cai — pontos com maior probabilidade de cobrança
+3. pegadinhas — diferenças entre conceitos parecidos, erros comuns, armadilhas conceituais
+4. relacoes_importantes — conexões causa→efeito, comparações diretas entre conceitos
+5. checklist_final — lista rápida para revisar mentalmente antes da prova
+
+Regras:
+* NÃO usar conhecimento externo. NÃO inventar. NÃO escrever de forma genérica.
+* Cobrir TODOS os autoestudos. NÃO repetir informação desnecessariamente.
+* Conteúdo útil para leitura em poucos minutos.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
+{{
+  "titulo": "Desespero para Prova — {req.subject}{week_note}",
+  "principais_conceitos": [
+    "Conceito: definição curta em 1-2 linhas"
+  ],
+  "o_que_mais_cai": [
+    "Ponto importante baseado no conteúdo"
+  ],
+  "pegadinhas": [
+    "Erro comum ou confusão conceitual"
+  ],
+  "relacoes_importantes": [
+    "Conceito A → efeito ou relação com B"
+  ],
+  "checklist_final": [
+    "Item essencial para revisar"
   ]
 }}""",
     }
@@ -356,18 +510,13 @@ Retorne JSON (somente JSON, sem markdown):
     raw = re.sub(r"```\s*", "", raw)
     raw = raw.strip()
 
-    # Try to parse; if truncated, attempt to close open JSON
     try:
         data = json.loads(raw)
     except Exception:
-        # Try to repair truncated JSON by closing open structures
         repaired = raw
-        # Count open braces/brackets and close them
         open_braces   = repaired.count("{") - repaired.count("}")
-        open_brackets  = repaired.count("[") - repaired.count("]")
-        # Remove trailing comma if any
+        open_brackets = repaired.count("[") - repaired.count("]")
         repaired = re.sub(r',\s*$', '', repaired.rstrip())
-        # Close open arrays first, then objects
         repaired += "]" * max(0, open_brackets)
         repaired += "}" * max(0, open_braces)
         try:
@@ -635,6 +784,58 @@ def build_flashcards_pdf(path, subject, color_hex, data):
         cv.showPage()
     cv.save()
 
+def build_desespero_pdf(path, subject, color_hex, data):
+    color = get_color(color_hex)
+    RED   = colors.HexColor("#F76A6A")
+    AMB   = colors.HexColor("#F7A83E")
+    GRN   = colors.HexColor("#22C9A0")
+    dark  = colors.HexColor("#1a1a2e")
+    W,H   = A4
+    cv = pdfcanvas.Canvas(path, pagesize=A4)
+    make_cover(cv, W, H, subject, "Desespero para Prova", color_hex)
+    cv.save()
+
+    ST = {
+        "title":  sty("t",  fontName="Helvetica-Bold", fontSize=22, spaceAfter=6, leading=28),
+        "h2":     sty("h2", fontName="Helvetica-Bold", fontSize=13, textColor=color, spaceBefore=14, spaceAfter=4, leading=18),
+        "h2red":  sty("h2r",fontName="Helvetica-Bold", fontSize=13, textColor=RED,   spaceBefore=14, spaceAfter=4, leading=18),
+        "h2amb":  sty("h2a",fontName="Helvetica-Bold", fontSize=13, textColor=AMB,   spaceBefore=14, spaceAfter=4, leading=18),
+        "h2grn":  sty("h2g",fontName="Helvetica-Bold", fontSize=13, textColor=GRN,   spaceBefore=14, spaceAfter=4, leading=18),
+        "body":   sty("body"),
+        "bullet": sty("bul", leftIndent=14, spaceAfter=4, leading=14),
+    }
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2.5*cm, rightMargin=2*cm, topMargin=2.5*cm, bottomMargin=2*cm)
+    story = []
+
+    story.append(Paragraph(data.get("titulo", f"Desespero para Prova — {subject}"), ST["title"]))
+    story.append(HRFlowable(width="100%", thickness=2, color=RED, spaceAfter=12))
+
+    sections = [
+        ("📌 Principais Conceitos",    "principais_conceitos", ST["h2"]),
+        ("🎯 O que mais cai",          "o_que_mais_cai",       ST["h2amb"]),
+        ("⚠️ Pegadinhas e Confusões",  "pegadinhas",           ST["h2red"]),
+        ("🔗 Relações Importantes",    "relacoes_importantes",  ST["h2"]),
+        ("✅ Checklist Final",         "checklist_final",       ST["h2grn"]),
+    ]
+
+    for title, key, style in sections:
+        items = data.get(key, [])
+        if not items: continue
+        story.append(Paragraph(title, style))
+        story.append(HRFlowable(width="100%", thickness=0.5, color=colors.HexColor("#dddddd"), spaceAfter=6))
+        for item in items:
+            story.append(Paragraph(f"• {item}", ST["bullet"]))
+        story.append(Spacer(1, 8))
+
+    doc.build(story)
+    buf.seek(0)
+    w = PdfWriter()
+    for p in PdfReader(path).pages: w.add_page(p)
+    for p in PdfReader(buf).pages: w.add_page(p)
+    with open(path,"wb") as f: w.write(f)
+
 @app.post("/pdf")
 async def make_pdf(req: PDFRequest):
     fname = f"/tmp/apostila_{req.mode}_{req.subject.replace(' ','_')}.pdf"
@@ -647,6 +848,8 @@ async def make_pdf(req: PDFRequest):
             build_simulado_pdf(fname, req.subject, req.subject_color, req.data, req.mode)
         elif req.mode == "flashcards":
             build_flashcards_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode == "desespero":
+            build_desespero_pdf(fname, req.subject, req.subject_color, req.data)
         else:
             raise HTTPException(400, "Modo inválido")
     except Exception as e:
@@ -664,7 +867,6 @@ class DriveUploadRequest(BaseModel):
 
 @app.post("/upload-drive")
 async def upload_drive(req: DriveUploadRequest):
-    # 1. Generate PDF first
     fname = f"/tmp/drive_{req.mode}_{req.subject.replace(' ','_')}.pdf"
     try:
         if req.mode == "apostila":
@@ -675,15 +877,14 @@ async def upload_drive(req: DriveUploadRequest):
             build_simulado_pdf(fname, req.subject, req.subject_color, req.data, req.mode)
         elif req.mode == "flashcards":
             build_flashcards_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode == "desespero":
+            build_desespero_pdf(fname, req.subject, req.subject_color, req.data)
         else:
             raise HTTPException(400, "Modo inválido")
     except Exception as e:
         raise HTTPException(500, f"Erro ao gerar PDF: {e}")
-
-    # 2. Upload to Drive
     try:
         link = upload_to_drive(fname, req.subject, req.weeks, req.mode)
     except Exception as e:
         raise HTTPException(500, f"Erro ao enviar para o Drive: {e}")
-
     return {"link": link, "message": "Arquivo enviado com sucesso!"}
