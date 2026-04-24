@@ -23,7 +23,8 @@ from google.oauth2 import service_account
 
 # ── Google Drive setup ────────────────────────────────────────────────────────
 
-DRIVE_ROOT_FOLDER = "1eGYQXjtJ0gUSxqD6WHZbHBuiXFpcxEGv"
+DRIVE_ROOT_FOLDER = "0APH2Y3zPPWOOUk9PVA"
+DRIVE_IS_SHARED   = True  # Shared Drive
 
 SUBJECT_SIGLAS = {
     "Programação": "COM",
@@ -55,9 +56,14 @@ def get_drive_service():
     return build("drive", "v3", credentials=creds)
 
 def get_or_create_folder(service, name: str, parent_id: str) -> str:
-    """Return folder ID, creating it if it doesn't exist."""
+    """Return folder ID, creating it if it doesn't exist. Supports Shared Drives."""
     q = f"name='{name}' and mimeType='application/vnd.google-apps.folder' and '{parent_id}' in parents and trashed=false"
-    res = service.files().list(q=q, fields="files(id,name)").execute()
+    res = service.files().list(
+        q=q,
+        fields="files(id,name)",
+        supportsAllDrives=True,
+        includeItemsFromAllDrives=True
+    ).execute()
     files = res.get("files", [])
     if files:
         return files[0]["id"]
@@ -66,7 +72,11 @@ def get_or_create_folder(service, name: str, parent_id: str) -> str:
         "mimeType": "application/vnd.google-apps.folder",
         "parents": [parent_id],
     }
-    folder = service.files().create(body=meta, fields="id").execute()
+    folder = service.files().create(
+        body=meta,
+        fields="id",
+        supportsAllDrives=True
+    ).execute()
     return folder["id"]
 
 def upload_to_drive(pdf_path: str, subject: str, weeks: list, mode: str) -> str:
@@ -78,7 +88,7 @@ def upload_to_drive(pdf_path: str, subject: str, weeks: list, mode: str) -> str:
     # Subject folder
     subject_folder = get_or_create_folder(service, subject, DRIVE_ROOT_FOLDER)
 
-    # Week folder — if multiple weeks, use combined name e.g. "Semana 01-03"
+    # Week folder
     if len(weeks) == 1:
         week_name = weeks[0]
     else:
@@ -87,18 +97,43 @@ def upload_to_drive(pdf_path: str, subject: str, weeks: list, mode: str) -> str:
 
     week_folder = get_or_create_folder(service, week_name, subject_folder)
 
-    # File name: Apostila(S-01, M-COM).pdf
+    # File name
     week_num = week_name.replace("Semana ", "").strip()
     file_name = f"{mode_lbl}(S-{week_num}, M-{sigla}).pdf"
 
-    # Upload
-    media = MediaFileUpload(pdf_path, mimetype="application/pdf", resumable=False)
-    file_meta = {"name": file_name, "parents": [week_folder]}
+    # Read file content
+    with open(pdf_path, "rb") as f:
+        file_content = f.read()
+
+    # Upload using MediaIoBaseUpload (avoids storage quota issue)
+    media = MediaIoBaseUpload(
+        io.BytesIO(file_content),
+        mimetype="application/pdf",
+        resumable=False
+    )
+    file_meta = {
+        "name": file_name,
+        "parents": [week_folder]
+    }
+
     uploaded = service.files().create(
-        body=file_meta, media_body=media, fields="id,webViewLink"
+        body=file_meta,
+        media_body=media,
+        fields="id,webViewLink",
+        supportsAllDrives=True
     ).execute()
 
-    return uploaded.get("webViewLink", "")
+    # Make file readable by anyone with link
+    try:
+        service.permissions().create(
+            fileId=uploaded["id"],
+            body={"role": "reader", "type": "anyone"},
+            supportsAllDrives=True
+        ).execute()
+    except Exception:
+        pass
+
+    return uploaded.get("webViewLink", f"https://drive.google.com/file/d/{uploaded['id']}/view")
 
 
 app = FastAPI()
