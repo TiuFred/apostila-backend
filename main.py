@@ -164,11 +164,10 @@ def call_ai(prompt: str, mode: str = "", subject: str = "") -> str:
     client = get_client()
     msg = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=8192,
-        system="Você é um assistente educacional especialista em criar materiais de estudo didáticos em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional. Seja conciso nos textos para garantir que o JSON fique completo.",
+        max_tokens=16000,
+        system="Você é um assistente educacional especialista em criar materiais de estudo didáticos em português brasileiro. Retorne SOMENTE JSON válido, sem markdown, sem texto adicional. Gere o conteúdo COMPLETO e DETALHADO — não resuma, não corte, não omita seções. O material deve ser extenso, aprofundado e cobrir todos os tópicos solicitados integralmente.",
         messages=[{"role": "user", "content": prompt}],
     )
-    # Log usage asynchronously
     if mode:
         log_usage(mode, subject, msg.usage.input_tokens, msg.usage.output_tokens)
     return msg.content[0].text
