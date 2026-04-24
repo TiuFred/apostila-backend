@@ -870,7 +870,47 @@ class DriveUploadRequest(BaseModel):
     weeks: List[str]
     data: dict
 
-@app.post("/upload-drive")
+@app.post("/upload-pdf-drive")
+async def upload_pdf_drive(req: Request):
+    body = await req.json()
+    b64 = body.get("data","")
+    title = body.get("title","autoestudo")
+    subject = body.get("subject","")
+    week = body.get("week","")
+
+    # Decode PDF
+    try:
+        pdf_bytes = base64.b64decode(b64)
+    except Exception as e:
+        raise HTTPException(400, f"Erro ao decodificar PDF: {e}")
+
+    # Save to temp file
+    safe_title = re.sub(r'[^\w\s\-]', '', title).strip().replace(' ', '_')[:80]
+    fname = f"/tmp/autoestudo_{safe_title}.pdf"
+    with open(fname, "wb") as f:
+        f.write(pdf_bytes)
+
+    # Upload to Drive: Subject -> Week -> Autoestudo -> file.pdf
+    try:
+        service = get_drive_service()
+        subject_folder = get_or_create_folder(service, subject or "Geral", DRIVE_ROOT_FOLDER)
+        week_folder    = get_or_create_folder(service, week or "Sem Semana", subject_folder)
+        auto_folder    = get_or_create_folder(service, "Autoestudo", week_folder)
+
+        file_name = f"{safe_title}.pdf"
+        media = MediaIoBaseUpload(io.BytesIO(pdf_bytes), mimetype="application/pdf", resumable=False)
+        uploaded = service.files().create(
+            body={"name": file_name, "parents": [auto_folder]},
+            media_body=media,
+            fields="id,webViewLink",
+            supportsAllDrives=True
+        ).execute()
+
+        return {"link": uploaded.get("webViewLink",""), "message": "PDF enviado ao Drive!"}
+    except Exception as e:
+        raise HTTPException(500, f"Erro ao enviar para o Drive: {e}")
+
+
 async def upload_drive(req: DriveUploadRequest):
     fname = f"/tmp/drive_{req.mode}_{req.subject.replace(' ','_')}.pdf"
     try:
