@@ -919,6 +919,7 @@ async def upload_pdf_drive(req: Request):
         raise HTTPException(500, f"Erro ao enviar para o Drive: {e}")
 
 
+@app.post("/upload-drive")
 async def upload_drive(req: DriveUploadRequest):
     fname = f"/tmp/drive_{req.mode}_{req.subject.replace(' ','_')}.pdf"
     try:
