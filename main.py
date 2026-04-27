@@ -611,20 +611,27 @@ def build_apostila_pdf(path, subject, color_hex, data):
               HRFlowable(width="100%",thickness=2,color=color,spaceAfter=12)]
     story += [Paragraph("Introdução", ST["h2"]), Paragraph(data.get("introducao",""), ST["body"]), Spacer(1,10)]
     for sec in data.get("secoes",[]):
-        elems = [Paragraph(sec["titulo"], ST["h2"]), HRFlowable(width="100%",thickness=0.5,color=color,spaceAfter=6)]
-        for par in sec.get("conteudo","").split("\n"):
-            if par.strip(): elems.append(Paragraph(par.strip(), ST["body"]))
+        # Keep only title + first paragraph together to avoid blank pages
+        header = [Paragraph(sec["titulo"], ST["h2"]), HRFlowable(width="100%",thickness=0.5,color=color,spaceAfter=6)]
+        paras = [p.strip() for p in sec.get("conteudo","").split("\n") if p.strip()]
+        if paras:
+            header.append(Paragraph(paras[0], ST["body"]))
+            story.append(KeepTogether(header))
+            for par in paras[1:]:
+                story.append(Paragraph(par, ST["body"]))
+        else:
+            story.append(KeepTogether(header))
         if sec.get("topicos"):
-            elems.append(Paragraph("Pontos-chave:", ST["h3"]))
-            for t in sec["topicos"]: elems.append(Paragraph(f"• {t}", ST["bullet"]))
+            story.append(Paragraph("Pontos-chave:", ST["h3"]))
+            for t in sec["topicos"]: story.append(Paragraph(f"• {t}", ST["bullet"]))
         if sec.get("exemplo"):
             bg = colors.HexColor(color_hex+"18")
             tbl = Table([[Paragraph(f"<b>Exemplo:</b> {sec['exemplo']}", ST["body"])]], colWidths=[14*cm])
             tbl.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,-1),bg),("BOX",(0,0),(-1,-1),1,color),
                 ("LEFTPADDING",(0,0),(-1,-1),10),("RIGHTPADDING",(0,0),(-1,-1),10),
                 ("TOPPADDING",(0,0),(-1,-1),8),("BOTTOMPADDING",(0,0),(-1,-1),8)]))
-            elems.append(tbl)
-        elems.append(Spacer(1,8)); story.append(KeepTogether(elems))
+            story.append(tbl)
+        story.append(Spacer(1,8))
     story += [PageBreak(), Paragraph("Resumo Final", ST["h2"]),
               HRFlowable(width="100%",thickness=1,color=color,spaceAfter=8),
               Paragraph(data.get("resumo",""), ST["body"])]
