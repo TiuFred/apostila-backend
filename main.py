@@ -42,6 +42,7 @@ MODE_LABELS = {
     "dissertativa": "SimuladoDiss",
     "flashcards":   "Flashcards",
     "desespero":    "DesesperaProva",
+    "matematica":   "SimuladoMat",
 }
 
 def get_drive_service():
@@ -402,7 +403,44 @@ Retorne exatamente este JSON (somente JSON, sem markdown):
   ]
 }}}}""",
 
-        "objetiva": base_instruction + f"""
+        "objetiva": base_instruction + (f"""
+Agora gere 12 questões objetivas de Cálculo/Matemática de alta qualidade para a matéria de {req.subject}.
+
+PERFIL DAS QUESTÕES — ESTILO VESTIBULAR DE CÁLCULO INTRODUTÓRIO:
+* Cada questão testa UMA habilidade matemática principal: limites, continuidade, derivadas, máximos e mínimos, interpretação de derivada, funções exponenciais, funções definidas por partes, produto escalar, produto vetorial, vetores, taxas de variação, análise de sinais ou cálculo diferencial básico.
+* A questão começa com breve contextualização técnica ou aplicada — o contexto NÃO interfere na matemática, serve apenas como introdução formal.
+* A função/equação/vetor deve vir PRONTA no enunciado. Não peça modelagem nem demonstrações.
+* O enunciado deve ser relativamente extenso, mas a resolução deve ser curta ou média (reconhecer a técnica e aplicar procedimento padrão).
+* Questões que PARECEM sofisticadas mas cuja resolução é procedural e objetiva.
+
+LINGUAGEM OBRIGATÓRIA — use expressões como:
+"Considere", "Determine", "Assinale", "Selecione", "Indique", "Analise as afirmações"
+
+ALTERNATIVAS ERRADAS — devem representar erros clássicos de aluno:
+* Erro de sinal
+* Derivada calculada incorretamente
+* Troca de operação vetorial
+* Erro algébrico simples
+* Interpretação errada da derivada
+
+DISTRIBUIÇÃO: 4 Fácil, 5 Média, 3 Difícil — TODAS do tipo tradicional (A–E), apenas UMA correta.
+Use o conteúdo dos autoestudos como base temática e enriqueça com seu conhecimento de Cálculo.
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
+{{{{
+  "titulo": "Simulado Matemática — {req.subject}{week_note}",
+  "questoes": [
+    {{{{
+      "numero": 1,
+      "tipo": "tradicional",
+      "enunciado": "Enunciado extenso com contextualização técnica, seguido da função/equação pronta para operar...",
+      "alternativas": {{{{"a": "...", "b": "...", "c": "...", "d": "...", "e": "..."}}}},
+      "resposta": "a",
+      "justificativa": "Resolução passo a passo indicando a técnica e o procedimento aplicado...",
+      "dificuldade": "Fácil"
+    }}}}
+  ]
+}}}}""" if req.subject.lower() in ["matemática","matematica","math"] else f"""
 Agora gere um simulado com 12 questões objetivas de alta qualidade.
 
 Distribuição: 12 questões — 4 Fácil, 5 Média, 3 Difícil. Mínimo 3 somatório.
@@ -438,7 +476,7 @@ Retorne exatamente este JSON (somente JSON, sem markdown):
       "dificuldade": "Média"
     }}}}
   ]
-}}}}""",
+}}}}"""),
 
         "dissertativa": base_instruction + f"""
 Agora gere 6 questões dissertativas de alta qualidade.
@@ -497,6 +535,52 @@ Retorne exatamente este JSON (somente JSON, sem markdown):
   ]
 }}}}""",
 
+        "matematica": base_instruction + f"""
+Agora gere um simulado de Matemática com 8 questões no estilo vestibular/cálculo introdutório, baseadas nos conteúdos fornecidos e enriquecidas com seu conhecimento matemático especializado.
+
+ESTRUTURA DE CADA QUESTÃO:
+* Comece com breve contextualização técnica ou aplicada (1-2 frases), sem exagerar na narrativa
+* O contexto serve apenas como introdução formal — a matemática deve estar totalmente definida no enunciado
+* A função/equação/vetor deve vir pronto no enunciado — não peça modelagem nem demonstrações
+* Exija reconhecimento direto de UMA técnica matemática específica
+* Resolução curta ou média — nunca extremamente longa
+* Foco procedural e objetivo
+
+ESTILO:
+* Linguagem formal e acadêmica
+* Use: "considere", "determine", "assinale", "selecione", "indique", "analise as afirmações"
+* Texto elaborado, mas interpretação baixa
+* Evite questões abertas ou subjetivas
+
+HABILIDADES A TESTAR (varie entre as questões):
+limites, continuidade, derivadas, máximos e mínimos, interpretação de derivada, funções exponenciais, funções definidas por partes, produto escalar, produto vetorial, vetores, taxas de variação, análise de sinais, cálculo diferencial básico
+
+ALTERNATIVAS ERRADAS — use erros clássicos de aluno:
+* Erro de sinal
+* Derivada incorreta
+* Troca de operação vetorial
+* Erro algébrico simples
+* Interpretação errada da derivada
+
+DISTRIBUIÇÃO: 2 Fácil, 4 Média, 2 Difícil
+
+Retorne exatamente este JSON (somente JSON, sem markdown):
+{{
+  "titulo": "Simulado Matemática — {req.subject}{week_note}",
+  "questoes": [
+    {{
+      "numero": 1,
+      "conteudo": "Derivadas",
+      "enunciado": "Enunciado elaborado com contextualização + função/equação definida + comando claro (determine, assinale, etc.)",
+      "alternativas": {{"a": "...", "b": "...", "c": "...", "d": "...", "e": "..."}},
+      "resposta": "b",
+      "resolucao": "Resolução passo a passo identificando a técnica e aplicando o procedimento",
+      "erro_classico": "Descrição do erro mais comum que leva à alternativa distratora principal",
+      "dificuldade": "Média"
+    }}
+  ]
+}}""",
+
         "desespero": base_instruction + f"""
 Agora gere um resumo de revisão intensiva "Desespero para Prova".
 
@@ -505,14 +589,14 @@ Use o conteúdo como base e adicione padrões típicos de cobrança e pegadinhas
 Estilo: direto, frases curtas, escaneável, ZERO enrolação.
 
 Retorne exatamente este JSON (somente JSON, sem markdown):
-{{{{
+{{
   "titulo": "Desespero para Prova — {req.subject}{week_note}",
   "principais_conceitos": ["Conceito: definição curta em 1-2 linhas"],
   "o_que_mais_cai": ["Ponto importante com alta probabilidade de cobrança"],
   "pegadinhas": ["Erro comum ou confusão conceitual clássica do tema"],
   "relacoes_importantes": ["Conceito A → efeito ou relação com B"],
   "checklist_final": ["Item essencial para revisar"]
-}}}}""",
+}}""",
     }
 
     if req.mode not in prompts:
@@ -856,6 +940,81 @@ def build_desespero_pdf(path, subject, color_hex, data):
     for p in PdfReader(buf).pages: w.add_page(p)
     with open(path,"wb") as f: w.write(f)
 
+def build_matematica_pdf(path, subject, color_hex, data):
+    color = get_color(color_hex)
+    GRN   = colors.HexColor("#22C9A0")
+    AMB   = colors.HexColor("#F7A83E")
+    dark  = colors.HexColor("#1a1a2e")
+    W,H   = A4
+    cv = pdfcanvas.Canvas(path, pagesize=A4)
+    make_cover(cv, W, H, subject, "Simulado Matemática", color_hex)
+    cv.save()
+
+    ST = {
+        "title":    sty("t",   fontName="Helvetica-Bold", fontSize=20, spaceAfter=6, leading=26),
+        "qnum":     sty("qn",  fontName="Helvetica-Bold", fontSize=13, textColor=color, spaceBefore=16, spaceAfter=4, leading=18),
+        "tag":      sty("tag", fontName="Helvetica-Bold", fontSize=10, textColor=color, spaceAfter=2, leading=14),
+        "body":     sty("body"),
+        "alt":      sty("alt", leftIndent=14, spaceAfter=3, leading=15),
+        "res":      sty("res", fontName="Helvetica-Oblique", fontSize=10, textColor=colors.HexColor("#555555"), spaceAfter=3, leading=14, leftIndent=10),
+        "h2":       sty("h2",  fontName="Helvetica-Bold", fontSize=13, textColor=color, spaceBefore=14, spaceAfter=6, leading=18),
+        "gab":      sty("gab", fontName="Helvetica-Bold", fontSize=11, textColor=GRN, spaceAfter=3, leading=15),
+    }
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=2.5*cm, rightMargin=2*cm, topMargin=2.5*cm, bottomMargin=2*cm)
+    story = []
+
+    story.append(Paragraph(data.get("titulo", f"Simulado Matemática — {subject}"), ST["title"]))
+    story.append(HRFlowable(width="100%", thickness=2, color=color, spaceAfter=14))
+
+    questoes = data.get("questoes", [])
+
+    # Questions section (no answers)
+    for q in questoes:
+        elems = []
+        header_parts = [f"Questão {q.get('numero','')}"]
+        if q.get("conteudo"): header_parts.append(f"[{q['conteudo']}]")
+        if q.get("dificuldade"): header_parts.append(f"• {q['dificuldade']}")
+        elems.append(Paragraph(" ".join(header_parts), ST["qnum"]))
+        elems.append(Paragraph(q.get("enunciado",""), ST["body"]))
+        alts = q.get("alternativas",{})
+        for letra in ["a","b","c","d","e"]:
+            if letra in alts:
+                elems.append(Paragraph(f"({letra.upper()}) {alts[letra]}", ST["alt"]))
+        elems.append(Spacer(1,4))
+        story.append(KeepTogether(elems[:3]))  # Keep q number + enunciado together
+        for el in elems[3:]:
+            story.append(el)
+
+    # Gabarito + Resoluções section
+    story.append(PageBreak())
+    story.append(Paragraph("Gabarito e Resoluções", ST["h2"]))
+    story.append(HRFlowable(width="100%", thickness=1, color=color, spaceAfter=12))
+
+    # Compact gabarito table
+    gab_items = [f"Q{q.get('numero','')}: {q.get('resposta','?').upper()}" for q in questoes]
+    story.append(Paragraph(" | ".join(gab_items), ST["gab"]))
+    story.append(Spacer(1,14))
+
+    # Full resolutions
+    for q in questoes:
+        elems = []
+        elems.append(Paragraph(f"Q{q.get('numero','')} — Gabarito: {q.get('resposta','?').upper()}", ST["qnum"]))
+        if q.get("resolucao"):
+            elems.append(Paragraph(f"Resolução: {q['resolucao']}", ST["res"]))
+        if q.get("erro_classico"):
+            elems.append(Paragraph(f"⚠ Erro clássico: {q['erro_classico']}", ST["res"]))
+        elems.append(Spacer(1,6))
+        story.append(KeepTogether(elems))
+
+    doc.build(story)
+    buf.seek(0)
+    w = PdfWriter()
+    for p in PdfReader(path).pages: w.add_page(p)
+    for p in PdfReader(buf).pages: w.add_page(p)
+    with open(path,"wb") as f: w.write(f)
+
 @app.post("/pdf")
 async def make_pdf(req: PDFRequest):
     fname = f"/tmp/apostila_{req.mode}_{req.subject.replace(' ','_')}.pdf"
@@ -870,6 +1029,8 @@ async def make_pdf(req: PDFRequest):
             build_flashcards_pdf(fname, req.subject, req.subject_color, req.data)
         elif req.mode == "desespero":
             build_desespero_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode == "matematica":
+            build_matematica_pdf(fname, req.subject, req.subject_color, req.data)
         else:
             raise HTTPException(400, "Modo inválido")
     except Exception as e:
@@ -940,6 +1101,8 @@ async def upload_drive(req: DriveUploadRequest):
             build_flashcards_pdf(fname, req.subject, req.subject_color, req.data)
         elif req.mode == "desespero":
             build_desespero_pdf(fname, req.subject, req.subject_color, req.data)
+        elif req.mode == "matematica":
+            build_matematica_pdf(fname, req.subject, req.subject_color, req.data)
         else:
             raise HTTPException(400, "Modo inválido")
     except Exception as e:
